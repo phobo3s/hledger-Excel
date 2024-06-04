@@ -440,19 +440,3 @@ FindAllOnWorksheets = ResultRange
 
 End Function
 
-b), "@")(0) & _
-                    ";" & Format(Split(commDict(stockObj)(stockObjSub)(stockObjSubSub), "@")(1), "0.0#######") & vbCrLf
-            Next stockObjSubSub
-        Next stockObjSub
-    Next stockObj
-    line = Replace(line, """", "")
-    Print #fileNo, line
-    Close #fileNo
-    
-    hledgerFile.Close
-    Call convertTxttoUTF(myFileAddr, myFileAddr)
-    Set tempReadFile = Nothing
-    fso.DeleteFile tempFileAddr, True
-
-End Sub
-Private Function LineCounter(str As String) As Integer

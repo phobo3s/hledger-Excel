@@ -2,6 +2,19 @@ Attribute VB_Name = "MainModule"
 Option Explicit
 Dim commDict As Object
 
+'main column Ledger headers
+Dim dateCol As Integer
+Dim transCodeCol As Integer
+Dim descriptionCol As Integer
+Dim notesCol As Integer
+Dim currencyCol As Integer
+Dim operationCol As Integer
+Dim tagCol As Integer
+Dim accNameCol As Integer
+Dim amountCol As Integer
+Dim rateCol As Integer
+Dim reconCol As Integer
+    
 Sub CreateAllFilesAKATornado()
     
     'aggregate all sub account pages
@@ -11,10 +24,45 @@ Sub CreateAllFilesAKATornado()
     'MAIN_LEDGER.Activate
     'Call ExportAsCSV
     'export commodity prices
-    TEFAS_PRICES.activate
-    Call ExportAsCSV
+    ''TEFAS_PRICES.activate
+    ''Call ExportAsCSV
     MAIN_LEDGER.activate
+End Sub
 
+Private Sub PopulateColumnHeaderIndexes(pageName As String)
+    Dim sh As Worksheet
+    Dim shName As String
+    
+    dateCol = 0
+    transCodeCol = 0
+    descriptionCol = 0
+    notesCol = 0
+    currencyCol = 0
+    operationCol = 0
+    tagCol = 0
+    accNameCol = 0
+    amountCol = 0
+    rateCol = 0
+    reconCol = 0
+        
+    For Each sh In ThisWorkbook.Worksheets
+        If sh.CodeName = pageName Then shName = sh.name: Exit For
+    Next sh
+    On Error Resume Next
+    With ThisWorkbook.Worksheets(shName)
+        dateCol = .Cells(1, 1).EntireRow.Find("Date").Column
+        transCodeCol = .Cells(1, 1).EntireRow.Find("Transaction Code").Column
+        descriptionCol = .Cells(1, 1).EntireRow.Find("Payee|Note").Column
+        notesCol = .Cells(1, 1).EntireRow.Find("Notes").Column
+        currencyCol = .Cells(1, 1).EntireRow.Find("Commodity/Currency").Column
+        operationCol = .Cells(1, 1).EntireRow.Find("Operation").Column
+        tagCol = .Cells(1, 1).EntireRow.Find("Tag/Note").Column
+        accNameCol = .Cells(1, 1).EntireRow.Find("Full Account Name").Column
+        amountCol = .Cells(1, 1).EntireRow.Find("Amount").Column
+        rateCol = .Cells(1, 1).EntireRow.Find("Rate/Price").Column
+        reconCol = .Cells(1, 1).EntireRow.Find("Reconciliation").Column
+    End With
+    On Error GoTo 0
 End Sub
 Private Function PopulateAccountsSheets() As Variant
 
@@ -50,30 +98,33 @@ End Sub
 
 Public Sub GetNewPriceData()
     
+    ' > Address column headers
+    Call PopulateColumnHeaderIndexes("TEFAS_PRICES")
+    ' < Address column headers
+    
     Dim commodityRange As Range
     With COMMODITIES
-        Set commodityRange = .Cells(.Cells(.Rows.Count, 1).End(xlUp).Row, 1)
+        Set commodityRange = .Cells(.Cells(.Rows.Count, dateCol).End(xlUp).Row, 1)
         Set commodityRange = commodityRange.offset(-(commodityRange.Row - commodityRange.End(xlUp).Row), 0).Resize(commodityRange.Row - commodityRange.End(xlUp).Row + 1, 1)
     End With
     
     Dim CommodityCount As Integer
     CommodityCount = commodityRange.Cells.Count
     Dim priceLastRowNum As Long
-    priceLastRowNum = TEFAS_PRICES.Cells(TEFAS_PRICES.Rows.Count, 1).End(xlUp).Row
+    priceLastRowNum = TEFAS_PRICES.Cells(TEFAS_PRICES.Rows.Count, dateCol).End(xlUp).Row
     
     Dim dateDifference As Integer
-    dateDifference = CInt(Date - TEFAS_PRICES.Cells(priceLastRowNum, 1))
+    dateDifference = CInt(Date - TEFAS_PRICES.Cells(priceLastRowNum, dateCol))
     
     If dateDifference = 0 Then Exit Sub
     
-    
-    TEFAS_PRICES.Cells(priceLastRowNum, 1).offset(1, 0).Resize(CommodityCount, 1).value = TEFAS_PRICES.Cells(TEFAS_PRICES.Rows.Count, 1).End(xlUp).value + 1
-    TEFAS_PRICES.Cells(priceLastRowNum, 3).offset(1, 0).Resize(CommodityCount, 1).Value2 = commodityRange.Cells.Value2
+    TEFAS_PRICES.Cells(priceLastRowNum, dateCol).offset(1, 0).Resize(CommodityCount, 1).value = TEFAS_PRICES.Cells(TEFAS_PRICES.Rows.Count, dateCol).End(xlUp).value + 1
+    TEFAS_PRICES.Cells(priceLastRowNum, currencyCol).offset(1, 0).Resize(CommodityCount, 1).Value2 = commodityRange.Cells.Value2
     Dim i As Integer
         For i = 0 To (CommodityCount - 1)
-            TEFAS_PRICES.Cells(priceLastRowNum, 5).offset(1 + i, 0).Value2 = PriceThat(TEFAS_PRICES.Cells(priceLastRowNum, 3).offset(1 + i, 0), _
-                                                                                        TEFAS_PRICES.Cells(priceLastRowNum, 2).offset(1 + i, 0), _
-                                                                                        TEFAS_PRICES.Cells(priceLastRowNum, 1).offset(1 + i, 0))
+            TEFAS_PRICES.Cells(priceLastRowNum, rateCol).offset(1 + i, 0).Value2 = PriceThat(TEFAS_PRICES.Cells(priceLastRowNum, rateCol).offset(1 + i, 0), _
+                                                                                            TEFAS_PRICES.Cells(priceLastRowNum, currencyCol).offset(1 + i, 0), _
+                                                                                            TEFAS_PRICES.Cells(priceLastRowNum, dateCol).offset(1 + i, 0))
     Next i
 
     If dateDifference <> 0 Then Call GetNewPriceData
@@ -193,40 +244,45 @@ Private Sub ExportHledgerFile()
     
     Dim commodityCommandsDict As Scripting.Dictionary
     Set commodityCommandsDict = New Scripting.Dictionary
-
+    
+    ' > Address column headers
+    Call PopulateColumnHeaderIndexes("MAIN_LEDGER")
+    ' < Address column headers
+    
     rownum = 2
     With MAIN_LEDGER
-        Do While .Cells(rownum, 1) <> ""
-            
-            ddate = Replace(.Cells(rownum, 1).value, ".", "-")
+        Do While .Cells(rownum, dateCol) <> ""
+            ' Get transaction values
+            ddate = Replace(.Cells(rownum, dateCol).value, ".", "-")
             ddateStr = Year(ddate) & "-" & IIf(Month(ddate) < 10, "0", "") & Month(ddate) & "-" & IIf(Day(ddate) < 10, "0", "") & Day(ddate)
-            transCode = "(" & .Cells(rownum, 2).value & ")"
-            Description = .Cells(rownum, 3).value
-            account = .Cells(rownum, 8).value
-            amount = .Cells(rownum, 9).value
-            mainCurrncy = GetCurrency(.Cells(rownum, 5))
-            commentTransaction = .Cells(rownum, 4).value
-            commentSplit1 = .Cells(rownum, 7).value
+            transCode = "(" & .Cells(rownum, transCodeCol).value & ")"
+            Description = .Cells(rownum, descriptionCol).value
+            account = .Cells(rownum, accNameCol).value
+            amount = .Cells(rownum, amountCol).value
+            mainCurrncy = GetCurrency(.Cells(rownum, currencyCol))
+            commentTransaction = .Cells(rownum, notesCol).value
+            commentSplit1 = .Cells(rownum, tagCol).value
             
+            '> Parse transaction data
             'first line
             hledgerFile.WriteLine ddateStr & "  *  " & transCode & "  " & Description '& "  " & IIf(commentTransaction <> "", ";" & commentTransaction, "")
             'first Posting
             blanks = String(longestAccountNameLen - Len(account) + IIf(left(amount, 1) = "-", 0, 1), " ")
-            assertion = IIf(.Cells(rownum, 11).value = "", "", "=" & .Cells(rownum, 11).value & " " & mainCurrncy & "  ")
+            assertion = IIf(.Cells(rownum, reconCol).value = "", "", "=" & .Cells(rownum, reconCol).value & " " & mainCurrncy & "  ")
             hledgerFile.WriteLine "  " & account & blanks & "  " & amount & " " & mainCurrncy & "  " & assertion & IIf(commentSplit1 <> "", ";" & commentSplit1, "")
             
             splitRowNum = rownum + 1
-            Do While .Cells(splitRowNum, 1) = "" And .Cells(splitRowNum, 8) <> ""
-                account = .Cells(splitRowNum, 8).value
-                amount = .Cells(splitRowNum, 9).value
-                splitCurrncy = GetCurrency(.Cells(splitRowNum, 5), mainCurrncy)
-                commentSplitN = .Cells(splitRowNum, 7).value
+            Do While .Cells(splitRowNum, dateCol) = "" And .Cells(splitRowNum, accNameCol) <> ""
+                account = .Cells(splitRowNum, accNameCol).value
+                amount = .Cells(splitRowNum, amountCol).value
+                splitCurrncy = GetCurrency(.Cells(splitRowNum, currencyCol), mainCurrncy)
+                commentSplitN = .Cells(splitRowNum, tagCol).value
                 'Nth posting
                 blanks = String(longestAccountNameLen - Len(account) + IIf(left(amount, 1) = "-", 0, 1), " ")
-                assertion = IIf(.Cells(splitRowNum, 11).value = "", "", "=" & .Cells(splitRowNum, 11).value & " " & splitCurrncy & "  ")
+                assertion = IIf(.Cells(splitRowNum, reconCol).value = "", "", "=" & .Cells(splitRowNum, reconCol).value & " " & splitCurrncy & "  ")
                 hledgerFile.WriteLine "  " & account & blanks & "  " & amount & " " & splitCurrncy & "  " & assertion & IIf(commentSplitN <> "", ";" & commentSplitN, "")
                 'lots special part
-                If .Cells(splitRowNum, 6).value = "Buy" Then
+                If .Cells(splitRowNum, operationCol).value = "Buy" Then
                     portfolioData = portfolioData & ddateStr & ";" & "Buy" & ";" & amount & ";" & Split(splitCurrncy, " @ ")(0) & ";" & Replace(Split(splitCurrncy, " @ ")(1), " TRY", "") & ";" & (CDec(Replace(Split(splitCurrncy, " @ ")(1), " TRY", "")) * (CDec(amount))) & vbCrLf
                     If Len(Split(Replace(splitCurrncy, """", ""), " @ ")(0)) <> 3 Then
                         portfolioData_Sws = portfolioData_Sws & ddateStr & ";" & "Buy" & ";" & amount & ";" & Split(splitCurrncy, " @ ")(0) & ";" & Replace(Split(splitCurrncy, " @ ")(1), " TRY", "") & ";" & (CDec(Replace(Split(splitCurrncy, " @ ")(1), " TRY", "")) * (CDec(amount))) & vbCrLf
@@ -240,7 +296,7 @@ Private Sub ExportHledgerFile()
                         
                     commodityCommandsDict.Add (hledgerFile.line) & "::" & ddateStr & "::" & amount & "::" & splitCurrncy & "::BUY", 1  'stock command
                     
-                ElseIf .Cells(splitRowNum, 6).value = "Sell" Then
+                ElseIf .Cells(splitRowNum, operationCol).value = "Sell" Then
                     portfolioData = portfolioData & ddateStr & ";" & "Sell" & ";" & amount & ";" & Split(splitCurrncy, " @ ")(0) & ";" & Replace(Split(splitCurrncy, " @ ")(1), " TRY", "") & ";" & (CDec(Replace(Split(splitCurrncy, " @ ")(1), " TRY", "")) * (CDec(amount))) & vbCrLf
                     If Len(Split(Replace(splitCurrncy, """", ""), " @ ")(0)) <> 3 Then
                         portfolioData_Sws = portfolioData_Sws & ddateStr & ";" & "Sell" & ";" & amount & ";" & Split(splitCurrncy, " @ ")(0) & ";" & Replace(Split(splitCurrncy, " @ ")(1), " TRY", "") & ";" & (CDec(Replace(Split(splitCurrncy, " @ ")(1), " TRY", "")) * (CDec(amount))) & vbCrLf
@@ -254,14 +310,15 @@ Private Sub ExportHledgerFile()
                     
                     commodityCommandsDict.Add (hledgerFile.line) & "::" & ddateStr & "::" & amount & "::" & splitCurrncy & "::SELL", 1 'unstock command
                 
-                ElseIf left(.Cells(splitRowNum, 6).value, 5) = "Split" Then
-                    ddate = CDate(Mid(.Cells(rownum, 3).value, InStr(1, .Cells(rownum, 3).value, "Tarih:") + 6))
+                ElseIf left(.Cells(splitRowNum, operationCol).value, 5) = "Split" Then
+                    ddate = CDate(Mid(.Cells(rownum, descriptionCol).value, InStr(1, .Cells(rownum, descriptionCol).value, "Tarih:") + 6))
                     ddateStr = Year(ddate) & "-" & IIf(Month(ddate) < 10, "0", "") & Month(ddate) & "-" & IIf(Day(ddate) < 10, "0", "") & Day(ddate)
-                    commodityCommandsDict.Add (hledgerFile.line) & "::" & ddateStr & "::" & Mid(.Cells(splitRowNum, 6).value, 7) & "::" & splitCurrncy & "::SPLIT", 1 'unstock command
+                    commodityCommandsDict.Add (hledgerFile.line) & "::" & ddateStr & "::" & Mid(.Cells(splitRowNum, operationCol).value, 7) & "::" & splitCurrncy & "::SPLIT", 1 'unstock command
                 Else
                 End If
                 splitRowNum = splitRowNum + 1
             Loop
+            '< Parse transaction data
             rownum = splitRowNum
             hledgerFile.WriteLine
         Loop
@@ -280,7 +337,7 @@ Private Sub ExportHledgerFile()
     Set tempReadFile = fso.OpenTextFile(tempFileAddr, 1, False, -2)
     Set hledgerFile = fso.OpenTextFile(myFileAddr, 2, True, -2) 'to go to the begining of the file
     
-    'get to the position
+    'get to the position and change writing according to buy sell stuff.
     Dim leftCountTemp As Integer
     Dim commandPartArray() As String
     Dim commandPartNum As Integer
@@ -324,14 +381,18 @@ Private Sub ExportHledgerFile()
     'permission denied
     'fso.DeleteFile tempFileAddr, True
     
+    ' > Address column headers
+    Call PopulateColumnHeaderIndexes("TEFAS_PRICES")
+    ' < Address column headers
+    
     rownum = 2
     hledgerFile.WriteLine
     With TEFAS_PRICES
-        Do While .Cells(rownum, 1) <> ""
-            ddate = Replace(.Cells(rownum, 1).value, ".", "-")
+        Do While .Cells(rownum, dateCol) <> ""
+            ddate = Replace(.Cells(rownum, dateCol).value, ".", "-")
             ddateStr = Year(ddate) & "-" & IIf(Month(ddate) < 10, "0", "") & Month(ddate) & "-" & IIf(Day(ddate) < 10, "0", "") & Day(ddate)
-            amount = .Cells(rownum, 5).value
-            mainCurrncy = .Cells(rownum, 3)
+            amount = .Cells(rownum, rateCol).value
+            mainCurrncy = .Cells(rownum, currencyCol)
             'Currency isminde karakterin sayýsal - number olmasýna karþý önlem "TI3" vakasý.
             With CreateObject("VBScript.RegExp")
                 .pattern = "(\d)"
@@ -342,30 +403,60 @@ Private Sub ExportHledgerFile()
             rownum = rownum + 1
         Loop
     End With
-
-    
+ 
+    'Create portfolioCsvPath for portfolio-performance
+    Dim line As String
+    Dim cashMovementsLine As String
+    Dim tempLine As Variant
     Dim fileNo As Variant
+    Dim stockObj As Variant
+    Dim commodityCommandsDictDates As Variant
+    Set commodityCommandsDictDates = New Scripting.Dictionary
+    For i = 0 To commodityCommandsDict.Count - 1
+        line = commodityCommandsDict.keys(i)
+        commodityCommandsDictDates.item(Split(line, "::")(0)) = Split(line, "::")(1)
+    Next i
+    line = ""
+    cashMovementsLine = ""
     fileNo = FreeFile
     Open portfolioCsvPath For Output As #fileNo 'Open file for overwriting! Replace Output with Append to append
-    Print #fileNo, portfolioData
+    For i = 0 To writeCommands.Count - 1
+        For Each tempLine In Split(writeCommands.Items(i), vbCrLf)
+            Do While left(tempLine, 1) = " "
+                tempLine = Mid(tempLine, 2)
+            Loop
+            If left(tempLine, 1) <> "[" And tempLine <> "" Then
+                line = line & commodityCommandsDictDates(writeCommands.keys(i))
+                stockObj = Split(tempLine, " ")
+                line = line & ";" & IIf(stockObj(0) > 0, "Buy", "Sell") & ";" & stockObj(0)
+                line = line & ";" & stockObj(1) & ";" & Abs(CDbl(stockObj(3))) & ";" & stockObj(0) * Abs(CDbl(stockObj(3)))
+                line = line & vbCrLf
+                cashMovementsLine = cashMovementsLine & commodityCommandsDictDates(writeCommands.keys(i))
+                cashMovementsLine = cashMovementsLine & ";" & IIf(CDbl(stockObj(0)) < 0, "Removal", "Deposit") & ";" & stockObj(0) * stockObj(3)
+                cashMovementsLine = cashMovementsLine & vbCrLf
+            Else
+            End If
+        Next tempLine
+    Next i
+    line = Replace(line, """", "")
+    cashMovementsLine = Replace(cashMovementsLine, """", "")
+    Print #fileNo, line 'portfolioData
     Close #fileNo
     
-    fileNo = FreeFile
-    Open portfolioCsvPath_Sws For Output As #fileNo 'Open file for overwriting! Replace Output with Append to append
-    Print #fileNo, portfolioData_Sws
-    Close #fileNo
+'    fileNo = FreeFile
+'    Open portfolioCsvPath_Sws For Output As #fileNo 'Open file for overwriting! Replace Output with Append to append
+'    Print #fileNo, portfolioData_Sws
+'    Close #fileNo
     
     fileNo = FreeFile
     Open portfolioCashCsvPath For Output As #fileNo 'Open file for overwriting! Replace Output with Append to append
-    Print #fileNo, portfolioCashData
+    Print #fileNo, cashMovementsLine
     Close #fileNo
-    
+
     fileNo = FreeFile
     Open portfolioCsvPath_investing For Output As #fileNo 'Open file for overwriting! Replace Output with Append to append
-    Dim stockObj As Variant
     Dim stockObjSub As Variant
     Dim stockObjSubSub As Variant
-    Dim line As String
     For Each stockObj In commDict.keys
         For Each stockObjSub In commDict(stockObj).keys
             For Each stockObjSubSub In commDict(stockObj)(stockObjSub).keys
@@ -723,14 +814,14 @@ Public Sub WritePrices(pricesToWrite As Variant, entityName As Variant)
         If TypeName(pricesToWrite) = "Variant()" Then
             For i = 0 To UBound(pricesToWrite)
                 .Cells(1, 1).offset(startRow + i - 1, 0).value = pricesToWrite(i, 0)
-                .Cells(1, 1).offset(startRow + i - 1, 2).value = entityName
-                .Cells(1, 1).offset(startRow + i - 1, 4).value = pricesToWrite(i, 1)
+                .Cells(1, 1).offset(startRow + i - 1, 1).value = entityName
+                .Cells(1, 1).offset(startRow + i - 1, 2).value = pricesToWrite(i, 1)
             Next i
         Else
             If pricesToWrite <> 0 Then
                 .Cells(1, 1).offset(startRow + 0 - 1, 0).value = Date
-                .Cells(1, 1).offset(startRow + 0 - 1, 2).value = entityName
-                .Cells(1, 1).offset(startRow + 0 - 1, 4).value = pricesToWrite
+                .Cells(1, 1).offset(startRow + 0 - 1, 1).value = entityName
+                .Cells(1, 1).offset(startRow + 0 - 1, 2).value = pricesToWrite
             Else
             
             End If
@@ -822,7 +913,7 @@ Private Function GetPricesMinMaxEntityDates()
         Do While .Cells(rownum, 1) <> ""
             ddate = .Cells(rownum, 1)
             entityCount = 0
-            entityName = .Cells(rownum, 3)
+            entityName = .Cells(rownum, 2)
                     'If ddate = 44796 Then Stop
                     If entityDict.Exists(entityName) Then
                         'If entityName = "TKM" Then Debug.Print entityCount
@@ -882,4 +973,5 @@ Private Function GetTransactionAccountNamess() As Object
 
 End Function
 
-i c e . U C I . T e l l M e . S u b s t r a t e U s e U s e r I d A s A n c h o r M a i l b o x C h a n g e G a t e \ " ,   \ " V \ "   :   t r u e ,   \ " S \ "   :   1 ,   \ " P 
+
+

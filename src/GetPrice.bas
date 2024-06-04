@@ -137,9 +137,9 @@ Private Function InferMarketPrices(name As String, startDateVal As Date, Optiona
     With TEFAS_PRICES
         Do While .Cells(rownum, 1) <> ""
             ddate = .Cells(rownum, 1)
-            entityName = .Cells(rownum, 3)
+            entityName = .Cells(rownum, 2)
             If entityName = name And ddate < lowestDate Then
-                entityPrice = .Cells(rownum, 5)
+                entityPrice = .Cells(rownum, 3)
                 lowestDate = ddate
             Else
             End If
@@ -487,7 +487,9 @@ If sson = "Error" Then
     StockPrice = 0
 Else
     vson = vson("value")
-    If UBound(vson) = -1 Then
+    If IsEmpty(vson) Then
+        StockPrice = 0
+    ElseIf UBound(vson) = -1 Then
         StockPrice = 0
     Else
         Dim result() As Variant
@@ -586,4 +588,3 @@ errquit:
     
 End Function
 
-thirty", "marginoferror" : "pointfive", "sampleratepertenthousand" : 0 }, "config78" : { "eventfrequency" : "seventeentolessthanthirty", "marginoferror" : "one", "sampleratepertenthousand" : 0 }, "config79" : { "eventfrequency" : "thirtytolessthanfiftyfive", "marginoferror" : "pointzeroone", "sampleratepertenthousand" : 100 }, "config80" : { "eventfrequency" : "thirtytolessthanfiftyfive", "marginoferror" : "pointzerotwo", "sampleratepertenthousand" : 10 }, "config81" : { "eventfrequency" : "thirtytolessthan
