@@ -17,3 +17,7 @@ The reasons why I used Excel, which may not align well with the philosophy of PT
 I used Excel for these reasons. In the distant future, I might transfer this work to Google Sheets so it can work on the web as well, but this will be VERY DIFFICULT. Or maybe a C# script will be good for cross platform.
 
 Please excuse my poor English, it is not my native language.
+
+## How to use:
+- WIP
+
